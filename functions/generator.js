@@ -6,6 +6,7 @@ admin.initializeApp(functions.config().firebase);
 let db = admin.firestore();
 
 function getWord(length, isDutch) {
+    let dictCollection;
     if (isDutch) {
         dictCollection = 'dict-nl'
     }
@@ -17,9 +18,10 @@ function getWord(length, isDutch) {
                     .where('length', '==', length)
                     .where('random', '>=', random32BitInt)
                     .orderBy('random')
-                    .limit(1)
+                    .limit(1);
                     
     return query.get().then(snapshot => {
+        let returnword;
         snapshot.forEach(doc => {
             returnword = doc.data()['word']
         });

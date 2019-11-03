@@ -2,13 +2,13 @@
 const {
   dialogflow,
   Confirmation
-} = require('actions-on-google')
+} = require('actions-on-google');
 
-const functions = require('firebase-functions')
-const {getWord} = require('./generator')
+const functions = require('firebase-functions');
+const {getWord} = require('./generator');
 
 // Create an app instance
-const app = dialogflow()
+const app = dialogflow();
 
 const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
 
@@ -16,14 +16,14 @@ const baseUrl = `https://${firebaseConfig.projectId}.firebaseapp.com`;
 
 const getSound = (sound) => `${baseUrl}/audio/${sound}`;
 
-const spellSlow = (word) => `<break time="200ms"/><prosody rate="slow"><say-as interpret-as="verbatim">${word}</say-as></prosody>`
+const spellSlow = (word) => `<break time="200ms"/><prosody rate="slow"><say-as interpret-as="verbatim">${word}</say-as></prosody>`;
 
 function getBlackWhiteResponse(black, white) {
     if (black === 0 && white === 0) {
         return "geen overeenkomsten";
     }
-    
-    var s = "";
+
+    let s = "";
     if (black > 0) {
         s += `${black} zwarte`;
     }
@@ -49,62 +49,60 @@ function checkSpelledWord(word, wordLength) {
     return false;
 }
 
-var Sounds = {
-    WAIT : `<audio src="${getSound('green-onions.mp3')}">Green onion song</audio>`,
-    WIN : `<audio src="${getSound('win.mp3')}">Win soundeffect</audio>`
-}
+const Sounds = {
+    WAIT: `<audio src="${getSound('green-onions.mp3')}">Green onion song</audio>`.repeat(4),
+    WIN: `<audio src="${getSound('win.mp3')}">Win soundeffect</audio>`
+};
 
 function blackWhites(word, attempt) {
-    word = word.toLowerCase()
-    attempt = attempt.toLowerCase()
-    var wordArray = word.split("");
-    var attemptArray = attempt.split("");
-    
-    var blacks = 0
-    var whites = 0
-    var maskedWord = word.split("");
-    var maskedAttempt = attempt.split("");
-    
-    zip = (...rows) => [...rows[0]].map((_,c) => rows.map(row => row[c]))
+    word = word.toLowerCase();
+    attempt = attempt.toLowerCase();
+    const wordArray = word.split("");
+    const attemptArray = attempt.split("");
+
+    let blacks = 0;
+    let whites = 0;
+    const maskedWord = word.split("");
+    const maskedAttempt = attempt.split("");
+
+    zip = (...rows) => [...rows[0]].map((_,c) => rows.map(row => row[c]));
 
     zip(attemptArray, wordArray).forEach((item, index) => {
-        var a = item[0]
-        var b = item[1]
+        const a = item[0];
+        const b = item[1];
         if (a === b) {
-            aIndex = maskedWord.indexOf(a)
-            maskedWord.splice(aIndex, 1)
-            aIndexAttempt = maskedAttempt.indexOf(a)
-            maskedAttempt.splice(aIndexAttempt, 1)
+            aIndex = maskedWord.indexOf(a);
+            maskedWord.splice(aIndex, 1);
+            aIndexAttempt = maskedAttempt.indexOf(a);
+            maskedAttempt.splice(aIndexAttempt, 1);
             blacks += 1
         }
-    })
+    });
 
     maskedAttempt.forEach((item, index) => {
-        var a = item
-        
-        aIndex = maskedWord.indexOf(a)
+        aIndex = maskedWord.indexOf(item);
         if (aIndex > -1) {
-            maskedWord.splice(aIndex, 1)
+            maskedWord.splice(aIndex, 1);
             whites += 1
         }
-    })
+    });
     
     return [blacks, whites]
 }
 
 app.intent('fixed_word_length', (conv, {wordLength}) => {
     return getWord(parseInt(wordLength), true).then((word) => {
-        conv.data.word = word.toLowerCase()
+        conv.data.word = word.toLowerCase();
         conv.ask(`
             <speak>Okee, ik heb een woord met ${wordLength} letters. Je kunt nu raden door te zeggen <break time="500ms"/> Hey Google, probeer <break time="500ms"/> gevolgd door het woord wat je wilt raden.
             ${Sounds.WAIT}
-            </speak>`)
+            </speak>`);
         return null;
     });
-})
+});
 
 app.intent('provide_guess', (conv, {word}) => {
-    word = word.toLowerCase()
+    word = word.toLowerCase();
     
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
@@ -121,14 +119,14 @@ app.intent('provide_guess', (conv, {word}) => {
         //conv.ask(`<speak>${Sounds.WIN}</speak>`);
         conv.ask(new Confirmation(`Goed gedaan! Wil je een nieuw spel beginnen?`));
     } else {
-        [blacks, whites] = blackWhites(conv.data.word, word)
-        conv.data.prevWord = word
-        conv.data.prevBlacks = blacks
-        conv.data.prevWhites = whites
+        [blacks, whites] = blackWhites(conv.data.word, word);
+        conv.data.prevWord = word;
+        conv.data.prevBlacks = blacks;
+        conv.data.prevWhites = whites;
         
         conv.ask(`<speak>${word} ${spellSlow(word)} heeft ${getBlackWhiteResponse(blacks, whites)}. ${Sounds.WAIT}</speak>`);
     }
-})
+});
 
 
 app.intent('repeat_blacks_whites', (conv) => {
@@ -142,7 +140,7 @@ app.intent('restart_game', (conv, input, confirmation) => {
     } else {
         conv.close(`Okee! Tot ziens.`)
     }
-})
+});
 
 app.intent('guess_fallback', (conv) => {
     conv.ask(`<speak>${Sounds.WAIT}</speak>`);
