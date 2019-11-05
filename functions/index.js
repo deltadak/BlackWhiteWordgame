@@ -50,7 +50,7 @@ function checkSpelledWord(word, wordLength) {
 }
 
 const Sounds = {
-    WAIT: `<audio src="${getSound('green-onions.mp3')}">Green onion song</audio>`.repeat(4),
+    WAIT: `<audio src="${getSound('green-onions.mp3')}">Green onion song</audio>`,
     WIN: `<audio src="${getSound('win.mp3')}">Win soundeffect</audio>`
 };
 
