@@ -161,6 +161,7 @@ app.intent('spoiler_yes', (conv) => {
 
 app.intent('welcome', (conv, {letterCount}) => {
     if (typeof letterCount  !== 'undefined' && letterCount) {
+        conv.contexts.set('game', 5);
         return startGame(conv, letterCount, false);
     } else {
         conv.contexts.set('decide_instruction_game', 1);
