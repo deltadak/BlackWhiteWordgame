@@ -90,15 +90,20 @@ function blackWhites(word, attempt) {
     return [blacks, whites]
 }
 
-app.intent('fixed_word_length', (conv, {wordLength}) => {
+function startGame(conv, wordLength, explanation) {
     return getWord(parseInt(wordLength), true).then((word) => {
         conv.data.word = word.toLowerCase();
         conv.ask(`
-            <speak>Okee, ik heb een woord met ${wordLength} letters. Je kunt nu raden door te zeggen <break time="500ms"/> Hey Google, probeer <break time="500ms"/> gevolgd door het woord wat je wilt raden.
-            ${Sounds.WAIT}
+            <speak>Okee, ik heb een woord met ${wordLength} letters.`
+                + (explanation ? `Je kunt nu raden door te zeggen <break time="500ms"/> Hey Google, probeer <break time="500ms"/> gevolgd door het woord wat je wilt raden.` : `Je kunt nu raden.`)
+                + `${Sounds.WAIT}
             </speak>`);
         return null;
     });
+}
+
+app.intent('word_length', (conv, {wordLength}) => {
+    return startGame(conv, wordLength, true);
 });
 
 app.intent('provide_guess', (conv, {word}) => {
@@ -152,6 +157,25 @@ app.intent('spoiler_no', (conv) => {
 
 app.intent('spoiler_yes', (conv) => {
     conv.ask(`<speak>Okee, het woord was ${conv.data.word} ${spellSlow(conv.data.word)}. Wil je een nieuw spel beginnen?</speak>`);
+});
+
+app.intent('welcome', (conv, {letterCount}) => {
+    if (typeof letterCount  !== 'undefined' && letterCount) {
+        return startGame(conv, letterCount, false);
+    } else {
+        conv.contexts.set('decide_instruction_game', 1);
+        conv.ask(`
+            <speak>
+              <prosody pitch="+2st">Hoi!</prosody>
+              Welkom bij het zwart-wit  <break time="50ms"/> woordspel! 
+              <par>
+                <media xml:id="question">
+                    <speak>Wil je de instructies horen?</speak>
+                </media>
+              </par>
+               Of wil je direct een spel beginnen.
+            </speak>`);
+    }
 });
 
 
