@@ -36,8 +36,12 @@ function getBlackWhiteResponse(black, white) {
     return s;
 }
 
+function removeCharacter(word, char) {
+    return word.split(char).join("");
+}
+
 function concatenateWord(word) {
-    return word.split(" ").join("");
+    return removeCharacter(word, " ");
 }
 
 function checkSpelledWord(word, wordLength) {
@@ -108,6 +112,7 @@ app.intent('word_length', (conv, {wordLength}) => {
 
 app.intent('provide_guess', (conv, {word}) => {
     word = word.toLowerCase();
+    word = removeCharacter(word, "'");
     
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
