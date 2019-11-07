@@ -112,8 +112,11 @@ app.intent('word_length', (conv, {wordLength}) => {
 
 app.intent('provide_guess', (conv, {word}) => {
     word = word.toLowerCase();
+    // Remove apostrophes
     word = removeCharacter(word, "'");
-    
+    // Remove hyphen
+    word = removeCharacter(word, "-");
+
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
             conv.ask(`<speak>Probeer 1 woord te geven.${Sounds.WAIT}</speak>`);
