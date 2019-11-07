@@ -129,8 +129,24 @@ app.intent('provide_guess', (conv, {word}) => {
     if (word.length !== conv.data.word.length) {
         conv.ask(`<speak>${word} heeft niet de juiste lengte, geef een woord ter lengte ${conv.data.word.length}. ${Sounds.WAIT}</speak>`);
     } else if (word === conv.data.word) {
-        //conv.ask(`<speak>${Sounds.WIN}</speak>`);
-        conv.ask(new Confirmation(`Goed gedaan! Wil je een nieuw spel beginnen?`));
+        conv.contexts.set('request_restart', 2);
+
+        conv.ask(`
+            <speak>
+                ${Sounds.WIN}
+                <break time="500ms"/>
+                <p>
+                    <prosody pitch="+3st">
+                        <s>Goed gedaan!</s> 
+                    </prosody>
+                    <s>Je hebt het woord geraden!</s>
+                </p>
+                <par>
+                    <media xml:id="question" begin="0.5s">
+                        <speak>Wil je een nieuw spel beginnen?</speak>
+                    </media>
+                </par>
+            </speak>`);
     } else {
         [blacks, whites] = blackWhites(conv.data.word, word);
         conv.data.prevWord = word;
