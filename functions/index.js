@@ -6,6 +6,7 @@ const {
 
 const functions = require('firebase-functions');
 const {getWord} = require('./generator');
+const {handleEasterEggs} = require('./eastereggs');
 
 // Create an app instance
 const app = dialogflow();
@@ -117,6 +118,8 @@ app.intent('provide_guess', (conv, {word}) => {
     // Remove hyphen
     word = removeCharacter(word, "-");
 
+    handleEasterEggs(conv, word);
+
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
             conv.ask(`<speak>Probeer 1 woord te geven.${Sounds.WAIT}</speak>`);
@@ -171,10 +174,6 @@ app.intent('restart_game', (conv, input, confirmation) => {
     }
 });
 
-app.intent('guess_fallback', (conv) => {
-    conv.ask(`<speak>${Sounds.WAIT}</speak>`);
-});
-
 app.intent('spoiler_no', (conv) => {
     conv.ask(`<speak>${Sounds.WAIT}</speak>`);
 });
@@ -201,6 +200,14 @@ app.intent('welcome', (conv, {letterCount}) => {
                Of wil je direct een spel beginnen.
             </speak>`);
     }
+});
+
+app.intent('guess_fallback', (conv) => {
+    conv.ask(`<speak>${Sounds.WAIT}</speak>`);
+});
+
+app.intent('no_input_game_intent', (conv) => {
+    conv.ask(`<speak>${Sounds.WAIT}</speak>`);
 });
 
 
