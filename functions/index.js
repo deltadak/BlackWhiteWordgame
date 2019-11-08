@@ -122,7 +122,7 @@ app.intent('provide_guess', (conv, {word}) => {
 
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
-            conv.ask(`<speak>Probeer 1 woord te geven.${Sounds.WAIT}</speak>`);
+            conv.ask(`<speak>Dat woord heeft niet de juiste lengte.${Sounds.WAIT}</speak>`);
             return;
         } else {
             word = concatenateWord(word);
