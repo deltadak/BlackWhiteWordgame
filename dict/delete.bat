@@ -1,0 +1,1 @@
+firebase firestore:delete --all-collections

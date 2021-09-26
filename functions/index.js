@@ -188,7 +188,7 @@ app.intent('welcome', (conv, {letterCount}) => {
         return startGame(conv, letterCount, false);
     } else {
         conv.contexts.set('decide_instruction_game', 1);
-        conv.ask(`
+        return conv.ask(`
             <speak>
               <prosody pitch="+2st">Hoi!</prosody>
               Welkom bij het zwart-wit  <break time="50ms"/> woordspel! 
@@ -203,11 +203,11 @@ app.intent('welcome', (conv, {letterCount}) => {
 });
 
 app.intent('guess_fallback', (conv) => {
-    conv.ask(`<speak>${Sounds.WAIT}</speak>`);
+    return conv.ask(`<speak>${Sounds.WAIT}</speak>`);
 });
 
 app.intent('no_input_game_intent', (conv) => {
-    conv.ask(`<speak>${Sounds.WAIT}</speak>`);
+    return conv.ask(`<speak>${Sounds.WAIT}</speak>`);
 });
 
 
