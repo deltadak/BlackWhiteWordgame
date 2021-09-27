@@ -1,25 +1,32 @@
 const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
 
-const baseUrl = `https://${firebaseConfig.projectId}.firebaseapp.com`;
+const {Storage} = require('@google-cloud/storage')
+const firebaseStorage = new Storage({
+    projectId: `${firebaseConfig.projectId}`,
+    keyFilename: 'storage-service-account.json',
+});
+const bucket = firebaseStorage.bucket(`${firebaseConfig.projectId}.appspot.com`);
 
-const getSound = (sound) => `${baseUrl}/audio/easter/${sound}`;
-
-const getAudioTag = (sound) => `<speak><audio src="${getSound(sound)}">${sound}</audio></speak>`;
+async function getAudioTag(e) {
+	const url = await bucket.file(`audio/easter/${e}`).publicUrl();
+	return `<speak><audio src="${url}">${e}</audio></speak>`
+}
 
 const eggs = {
     // Audio easter eggs
-    'stoomboot' : getAudioTag('boat.mp3'),
-    'fart' : getAudioTag('fart.mp3'),
-    'scheet' : getAudioTag('fart.mp3'),
-    'banana' : getAudioTag('minionbanana.mp3'),
-    'banaan' : getAudioTag('minionbanana.mp3'),
+    'stoomboot' : async() => await getAudioTag('boat.mp3'),
+    'fart' : async() => await getAudioTag('fart.mp3'),
+    'scheet' : async() => await getAudioTag('fart.mp3'),
+    'banana' : async() => await getAudioTag('minionbanana.mp3'),
+    'banaan' : async() => await getAudioTag('minionbanana.mp3'),
     // Sentence easter eggs
-    'google' : "<p><p><s>Hee!</s><s>Dat ben ik!</s></p></speak>",
+    'google' : async() => await "Hee! Dat ben ik!",
 };
 
-function handleEasterEggs(conv, word) {
+async function handleEasterEggs(conv, word) {
     if (word in eggs) {
-        conv.ask(eggs[word]);
+		const audioTag = await (eggs[word]());
+        conv.ask(audioTag);
     }
 }
 

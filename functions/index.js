@@ -10,12 +10,28 @@ const {handleEasterEggs} = require('./eastereggs');
 
 // Create an app instance
 const app = dialogflow();
-
 const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
 
-const baseUrl = `https://${firebaseConfig.projectId}.firebaseapp.com`;
+const {Storage} = require('@google-cloud/storage')
+const firebaseStorage = new Storage({
+    projectId: `${firebaseConfig.projectId}`,
+    keyFilename: 'storage-service-account.json',
+});
 
-const getSound = (sound) => `${baseUrl}/audio/${sound}`;
+const bucket = firebaseStorage.bucket(`${firebaseConfig.projectId}.appspot.com`);
+	
+async function getRandomWaitingSound() {
+	const [files] = await bucket.getFiles({
+		  prefix: 'audio/music/',
+		  delimiter: '/' // in order to only get files in this folder
+		});
+	const file = files[Math.floor(Math.random()*files.length)];
+	return file.publicUrl();
+}
+
+async function getFirebaseStorageElement(e) {
+	return await bucket.file(e).publicUrl();
+}
 
 const spellSlow = (word) => `<break time="200ms"/><prosody rate="slow"><say-as interpret-as="verbatim">${word}</say-as></prosody>`;
 
@@ -55,8 +71,8 @@ function checkSpelledWord(word, wordLength) {
 }
 
 const Sounds = {
-    WAIT: `<audio src="${getSound('green-onions.mp3')}">Green onion song</audio>`,
-    WIN: `<audio src="${getSound('win.mp3')}">Win soundeffect</audio>`
+    WAIT: async() => `<audio src="${await getRandomWaitingSound()}">Waiting song</audio>`,
+    WIN: async() => `<audio src="${await getFirebaseStorageElement('audio/win.mp3')}">Win soundeffect</audio>`
 };
 
 function blackWhites(word, attempt) {
@@ -95,34 +111,32 @@ function blackWhites(word, attempt) {
     return [blacks, whites]
 }
 
-function startGame(conv, wordLength, explanation) {
-    return getWord(parseInt(wordLength), true).then((word) => {
+async function startGame(conv, wordLength, explanation) {
+    return getWord(parseInt(wordLength), true).then(async (word) => {
         conv.data.word = word.toLowerCase();
-        conv.ask(`
+        return conv.ask(`
             <speak>Okee, ik heb een woord met ${wordLength} letters.`
                 + (explanation ? `Je kunt nu raden door te zeggen <break time="500ms"/> Hey Google, probeer <break time="500ms"/> gevolgd door het woord wat je wilt raden.` : `Je kunt nu raden.`)
-                + `${Sounds.WAIT}
-            </speak>`);
-        return null;
+                + `${await (Sounds.WAIT())} </speak>`);
     });
 }
 
-app.intent('word_length', (conv, {wordLength}) => {
+app.intent('word_length', async (conv, {wordLength}) => {
     return startGame(conv, wordLength, true);
 });
 
-app.intent('provide_guess', (conv, {word}) => {
+app.intent('provide_guess', async (conv, {word}) => {
     word = word.toLowerCase();
     // Remove apostrophes
     word = removeCharacter(word, "'");
     // Remove hyphen
     word = removeCharacter(word, "-");
 
-    handleEasterEggs(conv, word);
+    await handleEasterEggs(conv, word);
 
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
-            conv.ask(`<speak>Probeer 1 woord te geven.${Sounds.WAIT}</speak>`);
+            conv.ask(`<speak>Probeer 1 woord te geven.${await (Sounds.WAIT())}</speak>`);
             return;
         } else {
             word = concatenateWord(word);
@@ -130,13 +144,14 @@ app.intent('provide_guess', (conv, {word}) => {
     }
     
     if (word.length !== conv.data.word.length) {
-        conv.ask(`<speak>${word} heeft niet de juiste lengte, geef een woord ter lengte ${conv.data.word.length}. ${Sounds.WAIT}</speak>`);
+        conv.ask(`<speak>${word} heeft niet de juiste lengte, geef een woord ter lengte ${conv.data.word.length}. ${await (Sounds.WAIT())}</speak>`);
     } else if (word === conv.data.word) {
+		conv.contexts.delete('game');
         conv.contexts.set('request_restart', 2);
 
         conv.ask(`
             <speak>
-                ${Sounds.WIN}
+                ${await (Sounds.WIN())}
                 <break time="500ms"/>
                 <p>
                     <prosody pitch="+3st">
@@ -156,16 +171,16 @@ app.intent('provide_guess', (conv, {word}) => {
         conv.data.prevBlacks = blacks;
         conv.data.prevWhites = whites;
         
-        conv.ask(`<speak>${word} ${spellSlow(word)} heeft ${getBlackWhiteResponse(blacks, whites)}. ${Sounds.WAIT}</speak>`);
+        conv.ask(`<speak>${word} ${spellSlow(word)} heeft ${getBlackWhiteResponse(blacks, whites)}. ${await (Sounds.WAIT())}</speak>`);
     }
 });
 
 
-app.intent('repeat_blacks_whites', (conv) => {
-    conv.ask(`<speak>Het woord ${conv.data.prevWord} ${spellSlow(conv.data.prevWord)} gaf ${getBlackWhiteResponse(conv.data.prevBlacks, conv.data.prevWhites)}. ${Sounds.WAIT}</speak>`);
+app.intent('repeat_blacks_whites', async (conv) => {
+    conv.ask(`<speak>Het woord ${conv.data.prevWord} ${spellSlow(conv.data.prevWord)} gaf ${getBlackWhiteResponse(conv.data.prevBlacks, conv.data.prevWhites)}. ${await (Sounds.WAIT())}</speak>`);
 });
 
-app.intent('restart_game', (conv, input, confirmation) => {
+app.intent('restart_game', async (conv, input, confirmation) => {
     if (confirmation) {
         conv.contexts.set('decide_word_length', 2);
         conv.ask(`Hoeveel letters mag het nieuwe woord zijn?`)
@@ -174,15 +189,15 @@ app.intent('restart_game', (conv, input, confirmation) => {
     }
 });
 
-app.intent('spoiler_no', (conv) => {
-    conv.ask(`<speak>${Sounds.WAIT}</speak>`);
+app.intent('spoiler_no', async (conv) => {
+    conv.ask(`<speak>${await (Sounds.WAIT())}</speak>`);
 });
 
-app.intent('spoiler_yes', (conv) => {
+app.intent('spoiler_yes', async (conv) => {
     conv.ask(`<speak>Okee, het woord was ${conv.data.word} ${spellSlow(conv.data.word)}. Wil je een nieuw spel beginnen?</speak>`);
 });
 
-app.intent('welcome', (conv, {letterCount}) => {
+app.intent('welcome', async (conv, {letterCount}) => {
     if (typeof letterCount  !== 'undefined' && letterCount) {
         conv.contexts.set('game', 5);
         return startGame(conv, letterCount, false);
@@ -202,12 +217,12 @@ app.intent('welcome', (conv, {letterCount}) => {
     }
 });
 
-app.intent('guess_fallback', (conv) => {
-    return conv.ask(`<speak>${Sounds.WAIT}</speak>`);
+app.intent('guess_fallback', async (conv) => {
+    return conv.ask(`<speak>${await (Sounds.WAIT())}</speak>`);
 });
 
-app.intent('no_input_game_intent', (conv) => {
-    return conv.ask(`<speak>${Sounds.WAIT}</speak>`);
+app.intent('no_input_game_intent', async (conv) => {
+    return conv.ask(`<speak>${await (Sounds.WAIT())}</speak>`);
 });
 
 
