@@ -18,7 +18,7 @@ const firebaseStorage = new Storage({
     keyFilename: 'storage-service-account.json',
 });
 
-const bucket = firebaseStorage.bucket(`${firebaseConfig.projectId}.appspot.com`);
+const bucket = firebaseStorage.bucket("mastermind-word-game-data");
 	
 async function getRandomWaitingSound() {
 	const [files] = await bucket.getFiles({
@@ -34,7 +34,7 @@ async function getRandomWaitingSound() {
 	return file.publicUrl();
 }
 
-const waitingSoundRepeat = 5;
+const waitingSoundRepeat = 2;
 async function repeatRandomWaitingSound() {
 	const queue = [];
 	for (let i = 0; i < waitingSoundRepeat; i++) {

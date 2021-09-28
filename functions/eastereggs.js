@@ -5,7 +5,7 @@ const firebaseStorage = new Storage({
     projectId: `${firebaseConfig.projectId}`,
     keyFilename: 'storage-service-account.json',
 });
-const bucket = firebaseStorage.bucket(`${firebaseConfig.projectId}.appspot.com`);
+const bucket = firebaseStorage.bucket("mastermind-word-game-data");
 
 async function getAudioTag(e) {
 	const url = await bucket.file(`audio/easter/${e}`).publicUrl();
