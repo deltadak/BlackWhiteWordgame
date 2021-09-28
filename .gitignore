@@ -1,4 +1,5 @@
 dict/*.json
+functions/*.json
 public/audio/
 #### Firebase defaults 
 # Logs
