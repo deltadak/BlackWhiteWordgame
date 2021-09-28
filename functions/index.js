@@ -25,8 +25,23 @@ async function getRandomWaitingSound() {
 		  prefix: 'audio/music/',
 		  delimiter: '/' // in order to only get files in this folder
 		});
-	const file = files[Math.floor(Math.random()*files.length)];
+	
+	var file = null;
+	do {
+		file = files[Math.floor(Math.random()*files.length)];
+	} while (file.name.endsWith("/"));
+	
 	return file.publicUrl();
+}
+
+const waitingSoundRepeat = 5;
+async function repeatRandomWaitingSound() {
+	const queue = [];
+	for (let i = 0; i < waitingSoundRepeat; i++) {
+		queue.push(getRandomWaitingSound());
+	}
+	const results = await Promise.all(queue);
+	return results.map(r => `<audio src="${r}">Waiting song</audio>`).join(" ");
 }
 
 async function getFirebaseStorageElement(e) {
@@ -71,7 +86,7 @@ function checkSpelledWord(word, wordLength) {
 }
 
 const Sounds = {
-    WAIT: async() => `<audio src="${await getRandomWaitingSound()}">Waiting song</audio>`,
+    WAIT: async() => await repeatRandomWaitingSound(),
     WIN: async() => `<audio src="${await getFirebaseStorageElement('audio/win.mp3')}">Win soundeffect</audio>`
 };
 
