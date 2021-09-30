@@ -18,7 +18,8 @@
     "crypto": "^1.0.1",
     "firebase": "^9.1.0",
     "firebase-admin": "^9.11.1",
-    "firebase-functions": "^3.15.7"
+    "firebase-functions": "^3.15.7",
+    "node-fetch": "^3.0.0"
   },
   "devDependencies": {
     "eslint": "^7.32.0",

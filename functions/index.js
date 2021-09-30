@@ -5,48 +5,14 @@ const {
 } = require('actions-on-google');
 
 const functions = require('firebase-functions');
+const config = require('./config');
+const storage = require('./storage');
 const {getWord} = require('./generator');
+const {shuffle} = require('./utils');
 const {handleEasterEggs} = require('./eastereggs');
 
 // Create an app instance
 const app = dialogflow();
-const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
-
-const {Storage} = require('@google-cloud/storage')
-const firebaseStorage = new Storage({
-    projectId: `${firebaseConfig.projectId}`,
-    keyFilename: 'storage-service-account.json',
-});
-
-const bucket = firebaseStorage.bucket("mastermind-word-game-data");
-	
-async function getRandomWaitingSound() {
-	const [files] = await bucket.getFiles({
-		  prefix: 'audio/music/',
-		  delimiter: '/' // in order to only get files in this folder
-		});
-	
-	var file = null;
-	do {
-		file = files[Math.floor(Math.random()*files.length)];
-	} while (file.name.endsWith("/"));
-	
-	return file.publicUrl();
-}
-
-const waitingSoundRepeat = 2;
-async function repeatRandomWaitingSound() {
-	const queue = [];
-	for (let i = 0; i < waitingSoundRepeat; i++) {
-		queue.push(getRandomWaitingSound());
-	}
-	const results = await Promise.all(queue);
-	return results.map(r => `<audio src="${r}">Waiting song</audio>`).join(" ");
-}
-
-async function getFirebaseStorageElement(e) {
-	return await bucket.file(e).publicUrl();
-}
 
 const spellSlow = (word) => `<break time="200ms"/><prosody rate="slow"><say-as interpret-as="verbatim">${word}</say-as></prosody>`;
 
@@ -86,9 +52,40 @@ function checkSpelledWord(word, wordLength) {
 }
 
 const Sounds = {
-    WAIT: async() => await repeatRandomWaitingSound(),
-    WIN: async() => `<audio src="${await getFirebaseStorageElement('audio/win.mp3')}">Win soundeffect</audio>`
+    WIN: `<audio src="${storage.getAudio('win.mp3')}">Win soundeffect</audio>`
 };
+
+const MUSIC_FADEOUT = 7;
+const MUSIC_QUEUE = 2;
+function getWaitMusicTag(conv) {
+	if (conv.data.music_timestamp == -1) {
+		// first instance
+		conv.data.music_timestamp = new Date();
+	} else {
+		console.log(conv.data);
+		var timeStamp = new Date();
+		var offset = conv.data.music_offset;
+		
+		offset += (timeStamp.getTime() - new Date(conv.data.music_timestamp).getTime()) / 1000;
+		var current_index = conv.data.music_index;
+		
+		while (offset > conv.data.music[current_index].duration - MUSIC_FADEOUT) {
+			offset = Math.max(offset - conv.data.music[current_index].duration, 0);
+			current_index = (current_index + 1) % conv.data.music.length;
+		}
+		conv.data.music_timestamp = timeStamp;
+		conv.data.music_index = current_index;
+		conv.data.music_offset = offset;
+	}
+	var audioTag = "";
+	var index = conv.data.music_index;
+	for (let i = 0; i < MUSIC_QUEUE; i++) {
+		offsetTag = (i == 0 && conv.data.music_offset > 1) ? `clipBegin=\"${Math.floor(conv.data.music_offset)}s\"` : "";
+		audioTag += `<audio ${offsetTag} src="${storage.getMusic(conv.data.music[index].name)}">Wacht muziek</audio>`;
+		index = (index + 1) % conv.data.music.length;
+	}
+	return audioTag;
+}
 
 function blackWhites(word, attempt) {
     word = word.toLowerCase();
@@ -126,32 +123,32 @@ function blackWhites(word, attempt) {
     return [blacks, whites]
 }
 
-async function startGame(conv, wordLength, explanation) {
-    return getWord(parseInt(wordLength), true).then(async (word) => {
+function startGame(conv, wordLength, explanation) {
+    return getWord(parseInt(wordLength), true).then((word) => {
         conv.data.word = word.toLowerCase();
         return conv.ask(`
             <speak>Okee, ik heb een woord met ${wordLength} letters.`
                 + (explanation ? `Je kunt nu raden door te zeggen <break time="500ms"/> Hey Google, probeer <break time="500ms"/> gevolgd door het woord wat je wilt raden.` : `Je kunt nu raden.`)
-                + `${await (Sounds.WAIT())} </speak>`);
+                + `${getWaitMusicTag(conv)} </speak>`);
     });
 }
 
-app.intent('word_length', async (conv, {wordLength}) => {
+app.intent('word_length', (conv, {wordLength}) => {
     return startGame(conv, wordLength, true);
 });
 
-app.intent('provide_guess', async (conv, {word}) => {
+app.intent('provide_guess', (conv, {word}) => {
     word = word.toLowerCase();
     // Remove apostrophes
     word = removeCharacter(word, "'");
     // Remove hyphen
     word = removeCharacter(word, "-");
 
-    await handleEasterEggs(conv, word);
+    handleEasterEggs(conv, word);
 
     if (word.indexOf(' ') >= 0) {
         if (!checkSpelledWord(word, conv.data.word.length)) {
-            conv.ask(`<speak>Probeer 1 woord te geven.${await (Sounds.WAIT())}</speak>`);
+            conv.ask(`<speak>Probeer 1 woord te geven.${getWaitMusicTag(conv)}</speak>`);
             return;
         } else {
             word = concatenateWord(word);
@@ -159,14 +156,14 @@ app.intent('provide_guess', async (conv, {word}) => {
     }
     
     if (word.length !== conv.data.word.length) {
-        conv.ask(`<speak>${word} heeft niet de juiste lengte, geef een woord ter lengte ${conv.data.word.length}. ${await (Sounds.WAIT())}</speak>`);
+        conv.ask(`<speak>${word} heeft niet de juiste lengte, geef een woord ter lengte ${conv.data.word.length}. ${getWaitMusicTag(conv)}</speak>`);
     } else if (word === conv.data.word) {
 		conv.contexts.delete('game');
         conv.contexts.set('request_restart', 2);
 
         conv.ask(`
             <speak>
-                ${await (Sounds.WIN())}
+                ${Sounds.WIN}
                 <break time="500ms"/>
                 <p>
                     <prosody pitch="+3st">
@@ -186,34 +183,39 @@ app.intent('provide_guess', async (conv, {word}) => {
         conv.data.prevBlacks = blacks;
         conv.data.prevWhites = whites;
         
-        conv.ask(`<speak>${word} ${spellSlow(word)} heeft ${getBlackWhiteResponse(blacks, whites)}. ${await (Sounds.WAIT())}</speak>`);
+        conv.ask(`<speak>${word} ${spellSlow(word)} heeft ${getBlackWhiteResponse(blacks, whites)}. ${getWaitMusicTag(conv)}</speak>`);
     }
 });
 
 
-app.intent('repeat_blacks_whites', async (conv) => {
-    conv.ask(`<speak>Het woord ${conv.data.prevWord} ${spellSlow(conv.data.prevWord)} gaf ${getBlackWhiteResponse(conv.data.prevBlacks, conv.data.prevWhites)}. ${await (Sounds.WAIT())}</speak>`);
+app.intent('repeat_blacks_whites', (conv) => {
+    conv.ask(`<speak>Het woord ${conv.data.prevWord} ${spellSlow(conv.data.prevWord)} gaf ${getBlackWhiteResponse(conv.data.prevBlacks, conv.data.prevWhites)}. ${getWaitMusicTag(conv)}</speak>`);
 });
 
-app.intent('restart_game', async (conv, input, confirmation) => {
+app.intent('restart_game', (conv, input, confirmation) => {
     if (confirmation) {
+		conv.data.music = shuffle(conv.data.music);
+		conv.data.music_index = 0;
+		conv.data.music_offset = 0;
+		conv.data.music_timestamp = -1;
+		
         conv.contexts.set('decide_word_length', 2);
-        conv.ask(`Hoeveel letters mag het nieuwe woord zijn?`)
+        conv.ask(`Hoeveel letters mag het nieuwe woord zijn?`);
     } else {
         conv.close(`Okee! Tot ziens.`)
     }
 });
 
-app.intent('spoiler_no', async (conv) => {
-    conv.ask(`<speak>${await (Sounds.WAIT())}</speak>`);
+app.intent('spoiler_no', (conv) => {
+    conv.ask(`<speak>${getWaitMusicTag(conv)}</speak>`);
 });
 
-app.intent('spoiler_yes', async (conv) => {
+app.intent('spoiler_yes', (conv) => {
     conv.ask(`<speak>Okee, het woord was ${conv.data.word} ${spellSlow(conv.data.word)}. Wil je een nieuw spel beginnen?</speak>`);
 });
 
-app.intent('welcome', async (conv, {letterCount}) => {
-    if (typeof letterCount  !== 'undefined' && letterCount) {
+function initialize(conv, letterCount) {
+	if (typeof letterCount  !== 'undefined' && letterCount) {
         conv.contexts.set('game', 5);
         return startGame(conv, letterCount, false);
     } else {
@@ -230,14 +232,49 @@ app.intent('welcome', async (conv, {letterCount}) => {
                Of wil je direct een spel beginnen.
             </speak>`);
     }
+}
+
+async function fetchMusicList() {
+	const https = require('https');
+    return new Promise((resolve, reject) => {
+        https.get(storage.getMusicList(), (resp) => {
+		  let data = '';
+
+		  // A chunk of data has been received.
+		  resp.on('data', (chunk) => {
+			data += chunk;
+		  });
+
+		  // The whole response has been received. Print out the result.
+		  resp.on('end', () => {
+			resolve(JSON.parse(data));
+		  });
+
+		}).on("error", (err) => {
+			reject();
+		});
+    })
+}
+
+app.intent('welcome', async (conv, {letterCount}) => {
+	return fetchMusicList().then(
+		json => {
+			conv.data.music = shuffle(json.music);
+			conv.data.music_index = 0;
+			conv.data.music_offset = 0;
+			conv.data.music_timestamp = -1;
+			return initialize(conv, letterCount);
+		}).catch(() => {
+			return conv.close("Sorry, het lijkt erop dat de spelserver momenteel niet beschikbaar is. Probeer het later opnieuw.");
+		});
 });
 
-app.intent('guess_fallback', async (conv) => {
-    return conv.ask(`<speak>${await (Sounds.WAIT())}</speak>`);
+app.intent('guess_fallback', (conv) => {
+    return conv.ask(`<speak>${getWaitMusicTag(conv)}</speak>`);
 });
 
-app.intent('no_input_game_intent', async (conv) => {
-    return conv.ask(`<speak>${await (Sounds.WAIT())}</speak>`);
+app.intent('no_input_game_intent', (conv) => {
+    return conv.ask(`<speak>${getWaitMusicTag(conv)}</speak>`);
 });
 
 
