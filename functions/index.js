@@ -58,11 +58,10 @@ const Sounds = {
 const MUSIC_FADEOUT = 7;
 const MUSIC_QUEUE = 2;
 function getWaitMusicTag(conv) {
-	if (conv.data.music_timestamp == -1) {
+	if (conv.data.music_timestamp === -1) {
 		// first instance
 		conv.data.music_timestamp = new Date();
 	} else {
-		console.log(conv.data);
 		var timeStamp = new Date();
 		var offset = conv.data.music_offset;
 		
@@ -80,7 +79,7 @@ function getWaitMusicTag(conv) {
 	var audioTag = "";
 	var index = conv.data.music_index;
 	for (let i = 0; i < MUSIC_QUEUE; i++) {
-		offsetTag = (i == 0 && conv.data.music_offset > 1) ? `clipBegin=\"${Math.floor(conv.data.music_offset)}s\"` : "";
+		offsetTag = (i === 0 && conv.data.music_offset > 1) ? `clipBegin="${Math.floor(conv.data.music_offset)}s"` : "";
 		audioTag += `<audio ${offsetTag} src="${storage.getMusic(conv.data.music[index].name)}">Wacht muziek</audio>`;
 		index = (index + 1) % conv.data.music.length;
 	}
@@ -250,8 +249,6 @@ async function fetchMusicList() {
 			resolve(JSON.parse(data));
 		  });
 
-		}).on("error", (err) => {
-			reject();
 		});
     })
 }
