@@ -122,8 +122,22 @@ function blackWhites(word, attempt) {
     return [blacks, whites]
 }
 
+app.intent('resume_last', (conv) => {
+	conv.data.word = conv.user.storage.lastword;
+	wordLength = conv.data.word.length;
+	
+	return conv.ask(`
+            <speak>Okee, het vorige woord was een woord met ${wordLength} letters. Je kunt nu raden.`
+                + `${getWaitMusicTag(conv)} </speak>`);
+});
+
 function startGame(conv, wordLength, explanation) {
     return getWord(parseInt(wordLength), true).then((word) => {
+		if (conv.user.verification === 'VERIFIED') {
+			conv.user.storage.lastword = word.toLowerCase();
+			conv.user.storage.finishedlast = false;
+		}
+		
         conv.data.word = word.toLowerCase();
         return conv.ask(`
             <speak>Okee, ik heb een woord met ${wordLength} letters.`
@@ -159,6 +173,11 @@ app.intent('provide_guess', (conv, {word}) => {
     } else if (word === conv.data.word) {
 		conv.contexts.delete('game');
         conv.contexts.set('request_restart', 2);
+		
+		if (conv.user.verification === 'VERIFIED') {
+			conv.user.storage.lastword = conv.data.word;
+			conv.user.storage.finishedlast = true;
+		}
 
         conv.ask(`
             <speak>
@@ -191,25 +210,16 @@ app.intent('repeat_blacks_whites', (conv) => {
     conv.ask(`<speak>Het woord ${conv.data.prevWord} ${spellSlow(conv.data.prevWord)} gaf ${getBlackWhiteResponse(conv.data.prevBlacks, conv.data.prevWhites)}. ${getWaitMusicTag(conv)}</speak>`);
 });
 
-app.intent('restart_game', (conv, input, confirmation) => {
-    if (confirmation) {
-		conv.data.music = shuffle(conv.data.music);
-		conv.data.music_index = 0;
-		conv.data.music_offset = 0;
-		conv.data.music_timestamp = -1;
-		
-        conv.contexts.set('decide_word_length', 2);
-        conv.ask(`Hoeveel letters mag het nieuwe woord zijn?`);
-    } else {
-        conv.close(`Okee! Tot ziens.`)
-    }
-});
-
 app.intent('spoiler_no', (conv) => {
     conv.ask(`<speak>${getWaitMusicTag(conv)}</speak>`);
 });
 
 app.intent('spoiler_yes', (conv) => {
+	if (conv.user.verification === 'VERIFIED') {
+		conv.user.storage.lastword = conv.data.word;
+		conv.user.storage.finishedlast = true;
+	}
+	
     conv.ask(`<speak>Okee, het woord was ${conv.data.word} ${spellSlow(conv.data.word)}. Wil je een nieuw spel beginnen?</speak>`);
 });
 
@@ -218,7 +228,24 @@ function initialize(conv, letterCount) {
         conv.contexts.set('game', 5);
         return startGame(conv, letterCount, false);
     } else {
+		if (conv.user.verification === 'VERIFIED') {
+			if ('lastword' in conv.user.storage && 'finishedlast' in conv.user.storage) {
+				if (!conv.user.storage.finishedlast) {
+					// Ask user to return to last game
+					
+					conv.contexts.set('decide_resume_last', 1);
+					conv.contexts.set('decide_start_game', 1);
+					return conv.ask(`
+						<speak>
+						<prosody pitch="+2st">Hoi!</prosody>
+						  Welkom bij het zwart-wit  <break time="50ms"/> woordspel!
+						  Het lijkt erop dat je het vorige woord niet hebt geraden. Wil je hiermee verder spelen? Of wil je een nieuw spel beginnen?
+						</speak>`);
+				}
+			}
+		}
         conv.contexts.set('decide_instruction_game', 1);
+        conv.contexts.set('decide_start_game', 1);
         return conv.ask(`
             <speak>
               <prosody pitch="+2st">Hoi!</prosody>
